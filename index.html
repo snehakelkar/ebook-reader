@@ -41,7 +41,7 @@ html,body { height:100%; overflow:hidden; font-family:Georgia,'Times New Roman',
   box-shadow:0 0 30px rgba(0,0,0,.5);
 }
 .page-inner {
-  font-size:3em; line-height:1.45;
+  font-size:2em; line-height:1.45;
   max-height:100%; overflow-y:auto; width:100%;
   -webkit-overflow-scrolling:touch;
 }
@@ -294,8 +294,7 @@ document.querySelectorAll('.drawer-tab').forEach(t => {
     activeTab = t.dataset.tab;
     document.querySelectorAll('.drawer-tab').forEach(x => x.classList.remove('active'));
     t.classList.add('active');
-    document.getElementById('
-    tab-pages').style.display     = activeTab === 'pages'     ? '' : 'none';
+    document.getElementById('tab-pages').style.display     = activeTab === 'pages'     ? '' : 'none';
     document.getElementById('tab-bookmarks').style.display = activeTab === 'bookmarks' ? '' : 'none';
     if (activeTab === 'pages') scrollPageListToCurrent();
     if (activeTab === 'bookmarks') renderBookmarkList();
