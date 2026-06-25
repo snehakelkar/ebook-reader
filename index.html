@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PDF Flipbook</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; font-family: Georgia, 'Times New Roman', serif; background: #2b2b2b; }
+
+  #upload {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 24px; padding: 24px;
+    background: #2b2b2b; color: #eee; text-align: center; z-index: 100;
+  }
+  #upload h1 { font-size: 28px; font-weight: normal; }
+  #upload p { font-size: 16px; opacity: .7; max-width: 320px; line-height: 1.5; }
+  .btn {
+    background: #c9a227; color: #1a1a1a; border: none; padding: 16px 32px;
+    font-size: 18px; border-radius: 8px; font-family: inherit; cursor: pointer;
+  }
+  #file { display: none; }
+  #loading { font-size: 16px; opacity: .7; }
+
+  #book { position: fixed; inset: 0; display: none; background: #1a1a1a; }
+  .page {
+    position: absolute; inset: 0; padding: 40px 28px;
+    background: #f4ecd8; color: #2a2418;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    transform-origin: left center;
+    backface-visibility: hidden;
+    transition: transform .55s ease;
+    box-shadow: 0 0 30px rgba(0,0,0,.5);
+  }
+  .page-inner {
+    font-size: 3em;
+    line-height: 1.4;
+    max-height: 100%;
+    overflow-y: auto;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+  .page.flipping { transform: rotateY(-110deg); z-index: 50; }
+  .page.below { z-index: 1; }
+
+  #counter {
+    position: fixed; bottom: 14px; left: 0; right: 0; text-align: center;
+    color: #888; font-size: 14px; z-index: 60; pointer-events: none;
+  }
+  #hint {
+    position: fixed; bottom: 40px; left: 0; right: 0; text-align: center;
+    color: #aaa; font-size: 14px; z-index: 60; pointer-events: none;
+    animation: fade 3s ease forwards;
+  }
+  @keyframes fade { 0%,70% { opacity: .8; } 100% { opacity: 0; } }
+</style>
+</head>
+<body>
+
+<div id="upload">
+  <h1>📖 PDF Flipbook</h1>
+  <p>Upload a PDF. The text is enlarged ~3x. Tap the right side to go forward, the left side to go back.</p>
+  <button class="btn" onclick="document.getElementById('file').click()">Choose PDF</button>
+  <input type="file" id="file" accept="application/pdf">
+  <div id="loading"></div>
+</div>
+
+<div id="book">
+  <div id="counter"></div>
+  <div id="hint">Tap right → forward · Tap left → back</div>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const WORDS_PER_PAGE = 55; // tune chunk size of words per "book" page
+let pages = [];
+let idx = 0;
+
+const fileInput = document.getElementById('file');
+const loading = document.getElementById('loading');
+const uploadScreen = document.getElementById('upload');
+const book = document.getElementById('book');
+const counter = document.getElementById('counter');
+
+fileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  loading.textContent = 'Reading PDF…';
+  try {
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    let fullText = '';
+    for (let p = 1; p <= pdf.numPages; p++) {
+      loading.textContent = `Reading page ${p} of ${pdf.numPages}…`;
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      fullText += content.items.map(i => i.str).join(' ') + ' ';
+    }
+    buildPages(fullText);
+    if (pages.length === 0) { loading.textContent = 'No readable text found in this PDF.'; return; }
+    startBook();
+  } catch (err) {
+    loading.textContent = 'Could not read this PDF: ' + err.message;
+  }
+});
+
+function buildPages(text) {
+  const words = text.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  pages = [];
+  for (let i = 0; i < words.length; i += WORDS_PER_PAGE) {
+    pages.push(words.slice(i, i + WORDS_PER_PAGE).join(' '));
+  }
+}
+
+function startBook() {
+  uploadScreen.style.display = 'none';
+  book.style.display = 'block';
+  idx = 0;
+  renderPage();
+  book.addEventListener('click', onTap);
+}
+
+function renderPage() {
+  document.querySelectorAll('.page').forEach(p => p.remove());
+  const div = document.createElement('div');
+  div.className = 'page';
+  const inner = document.createElement('div');
+  inner.className = 'page-inner';
+  inner.textContent = pages[idx];
+  div.appendChild(inner);
+  book.insertBefore(div, counter);
+  counter.textContent = `${idx + 1} / ${pages.length}`;
+}
+
+let animating = false;
+function onTap(e) {
+  if (animating) return;
+  const forward = e.clientX > window.innerWidth / 2;
+
+  if (forward && idx >= pages.length - 1) return;
+  if (!forward && idx <= 0) return;
+
+  if (forward) {
+    animating = true;
+    const current = document.querySelector('.page');
+    current.classList.add('flipping');
+    setTimeout(() => {
+      idx++;
+      renderPage();
+      animating = false;
+    }, 360);
+  } else {
+    idx--;
+    renderPage();
+    const current = document.querySelector('.page');
+    current.style.transition = 'none';
+    current.style.transform = 'rotateY(-110deg)';
+    requestAnimationFrame(() => {
+      current.style.transition = 'transform .55s ease';
+      current.style.transform = 'rotateY(0deg)';
+    });
+  }
+}
+</script>
+</body>
+</html>
