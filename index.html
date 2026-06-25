@@ -294,7 +294,8 @@ document.querySelectorAll('.drawer-tab').forEach(t => {
     activeTab = t.dataset.tab;
     document.querySelectorAll('.drawer-tab').forEach(x => x.classList.remove('active'));
     t.classList.add('active');
-    document.getElementById('tab-pages').style.display     = activeTab === 'pages'     ? '' : 'none';
+    document.getElementById('
+    tab-pages').style.display     = activeTab === 'pages'     ? '' : 'none';
     document.getElementById('tab-bookmarks').style.display = activeTab === 'bookmarks' ? '' : 'none';
     if (activeTab === 'pages') scrollPageListToCurrent();
     if (activeTab === 'bookmarks') renderBookmarkList();
