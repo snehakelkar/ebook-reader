@@ -6,89 +6,321 @@
 <title>PDF Flipbook</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { height: 100%; overflow: hidden; font-family: Georgia, 'Times New Roman', serif; background: #2b2b2b; }
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body { height:100%; overflow:hidden; font-family:Georgia,'Times New Roman',serif; background:#2b2b2b; }
 
-  #upload {
-    position: fixed; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 24px; padding: 24px;
-    background: #2b2b2b; color: #eee; text-align: center; z-index: 100;
-  }
-  #upload h1 { font-size: 28px; font-weight: normal; }
-  #upload p { font-size: 16px; opacity: .7; max-width: 320px; line-height: 1.5; }
-  .btn {
-    background: #c9a227; color: #1a1a1a; border: none; padding: 16px 32px;
-    font-size: 18px; border-radius: 8px; font-family: inherit; cursor: pointer;
-  }
-  #file { display: none; }
-  #loading { font-size: 16px; opacity: .7; }
+/* ── Upload screen ── */
+#upload {
+  position:fixed; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:24px; padding:24px;
+  background:#2b2b2b; color:#eee; text-align:center; z-index:200;
+}
+#upload h1 { font-size:28px; font-weight:normal; }
+#upload p  { font-size:16px; opacity:.7; max-width:320px; line-height:1.6; }
+.btn {
+  background:#c9a227; color:#1a1a1a; border:none; padding:14px 28px;
+  font-size:17px; border-radius:8px; font-family:inherit; cursor:pointer;
+  display:inline-flex; align-items:center; gap:8px;
+}
+.btn:active { opacity:.8; }
+#file { display:none; }
+#loading { font-size:15px; opacity:.7; }
 
-  #book { position: fixed; inset: 0; display: none; background: #1a1a1a; }
-  .page {
-    position: absolute; inset: 0; padding: 40px 28px;
-    background: #f4ecd8; color: #2a2418;
-    display: flex; align-items: center; justify-content: center;
-    overflow: hidden;
-    transform-origin: left center;
-    backface-visibility: hidden;
-    transition: transform .55s ease;
-    box-shadow: 0 0 30px rgba(0,0,0,.5);
-  }
-  .page-inner {
-    font-size: 3em;
-    line-height: 1.4;
-    max-height: 100%;
-    overflow-y: auto;
-    width: 100%;
-    -webkit-overflow-scrolling: touch;
-  }
-  .page.flipping { transform: rotateY(-110deg); z-index: 50; }
-  .page.below { z-index: 1; }
+/* ── Book wrapper ── */
+#book { position:fixed; inset:0; display:none; background:#1a1a1a; }
 
-  #counter {
-    position: fixed; bottom: 14px; left: 0; right: 0; text-align: center;
-    color: #888; font-size: 14px; z-index: 60; pointer-events: none;
-  }
-  #hint {
-    position: fixed; bottom: 40px; left: 0; right: 0; text-align: center;
-    color: #aaa; font-size: 14px; z-index: 60; pointer-events: none;
-    animation: fade 3s ease forwards;
-  }
-  @keyframes fade { 0%,70% { opacity: .8; } 100% { opacity: 0; } }
+/* ── Page ── */
+.page {
+  position:absolute; inset:0; padding:52px 28px 56px;
+  background:#f4ecd8; color:#2a2418;
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden;
+  transform-origin:left center;
+  backface-visibility:hidden;
+  transition:transform .55s ease;
+  box-shadow:0 0 30px rgba(0,0,0,.5);
+}
+.page-inner {
+  font-size:3em; line-height:1.45;
+  max-height:100%; overflow-y:auto; width:100%;
+  -webkit-overflow-scrolling:touch;
+}
+
+.page.flipping { transform:rotateY(-110deg); z-index:50; }
+
+/* ── Top bar ── */
+#topbar {
+  position:fixed; top:0; left:0; right:0; height:44px;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 12px; background:rgba(26,26,26,.92);
+  backdrop-filter:blur(6px); z-index:80;
+}
+.icon-btn {
+  background:none; border:none; color:#c9a227; font-size:22px;
+  cursor:pointer; padding:6px; line-height:1;
+}
+#page-label { color:#aaa; font-size:13px; }
+
+/* ── Bottom progress bar ── */
+#progress-wrap {
+  position:fixed; bottom:0; left:0; right:0; height:28px;
+  display:flex; align-items:center; padding:0 12px; gap:8px;
+  background:rgba(26,26,26,.88); z-index:80;
+}
+#progress-bar {
+  flex:1; height:4px; background:#444; border-radius:2px; overflow:hidden;
+}
+#progress-fill { height:100%; background:#c9a227; width:0%; transition:width .3s; }
+#prog-nums { color:#666; font-size:11px; white-space:nowrap; }
+
+/* ── Side drawer ── */
+#drawer {
+  position:fixed; top:0; right:0; bottom:0; width:78vw; max-width:320px;
+  background:#1e1b16; color:#ddd; z-index:150;
+  transform:translateX(100%); transition:transform .3s ease;
+  display:flex; flex-direction:column;
+  box-shadow:-4px 0 20px rgba(0,0,0,.5);
+}
+#drawer.open { transform:translateX(0); }
+#drawer-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:140;
+  display:none;
+}
+#drawer-overlay.open { display:block; }
+
+#drawer-header {
+  padding:16px; border-bottom:1px solid #333;
+  display:flex; align-items:center; justify-content:space-between;
+}
+#drawer-header h2 { font-size:17px; font-weight:normal; color:#c9a227; }
+#drawer-tabs {
+  display:flex; border-bottom:1px solid #333;
+}
+.drawer-tab {
+  flex:1; padding:11px 0; text-align:center; font-size:13px;
+  color:#888; cursor:pointer; border:none; background:none;
+  font-family:inherit; border-bottom:2px solid transparent;
+}
+.drawer-tab.active { color:#c9a227; border-bottom-color:#c9a227; }
+
+#drawer-body { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+
+/* Page list */
+.page-list-item {
+  padding:14px 16px; border-bottom:1px solid #2a2a2a;
+  cursor:pointer; display:flex; align-items:center; gap:12px;
+  font-size:14px; color:#ccc;
+}
+.page-list-item:active { background:#2a2520; }
+.page-list-item.current { color:#c9a227; }
+.pli-num {
+  min-width:38px; height:38px; border-radius:6px;
+  background:#2a2520; display:flex; align-items:center; justify-content:center;
+  font-size:12px; color:#888; flex-shrink:0;
+}
+.page-list-item.current .pli-num { background:#c9a227; color:#1a1a1a; }
+.pli-preview { font-size:12px; color:#666; margin-top:3px; overflow:hidden;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+
+/* Jump input */
+#jump-wrap {
+  padding:14px 16px; border-bottom:1px solid #2a2a2a;
+  display:flex; gap:8px;
+}
+#jump-input {
+  flex:1; background:#2a2520; border:1px solid #444; color:#eee;
+  padding:9px 12px; border-radius:6px; font-size:15px; font-family:inherit;
+}
+#jump-btn {
+  background:#c9a227; color:#1a1a1a; border:none; border-radius:6px;
+  padding:9px 14px; font-size:14px; cursor:pointer; font-family:inherit;
+}
+
+/* Bookmarks panel */
+.bm-item {
+  padding:14px 16px; border-bottom:1px solid #2a2a2a;
+  cursor:pointer; display:flex; align-items:flex-start; gap:12px;
+}
+.bm-item:active { background:#2a2520; }
+.bm-left { flex:1; }
+.bm-page { font-size:13px; color:#c9a227; margin-bottom:4px; }
+.bm-preview { font-size:12px; color:#777; overflow:hidden;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.bm-del {
+  background:none; border:none; color:#555; font-size:20px;
+  cursor:pointer; padding:2px 4px; line-height:1; flex-shrink:0;
+}
+.bm-del:active { color:#e05; }
+#no-bookmarks { padding:32px 16px; text-align:center; color:#555; font-size:14px; }
+
+/* Resume banner */
+#resume-banner {
+  display:none; position:fixed; bottom:36px; left:50%; transform:translateX(-50%);
+  background:#2a2520; border:1px solid #c9a227; border-radius:10px;
+  padding:14px 20px; color:#eee; font-size:15px; z-index:90;
+  text-align:center; max-width:88vw; box-shadow:0 4px 16px rgba(0,0,0,.4);
+}
+#resume-banner button { margin:0 6px; }
+#resume-yes { background:#c9a227; color:#1a1a1a; }
+#resume-no  { background:transparent; color:#888; border:1px solid #555; }
+#resume-banner button {
+  border:none; padding:8px 16px; border-radius:6px; font-size:14px;
+  font-family:inherit; cursor:pointer; margin-top:10px;
+}
+
+/* Bookmark flash */
+#bm-flash {
+  position:fixed; top:54px; left:50%; transform:translateX(-50%);
+  background:#c9a227; color:#1a1a1a; padding:8px 18px; border-radius:20px;
+  font-size:14px; z-index:90; opacity:0; pointer-events:none;
+  transition:opacity .3s;
+}
+
+@keyframes fade3 { 0%,60%{opacity:.8} 100%{opacity:0} }
+#hint {
+  position:fixed; bottom:36px; left:0; right:0; text-align:center;
+  color:#888; font-size:13px; z-index:75; pointer-events:none;
+  animation:fade3 4s ease forwards;
+}
 </style>
 </head>
 <body>
 
+<!-- Upload -->
 <div id="upload">
   <h1>📖 PDF Flipbook</h1>
-  <p>Upload a PDF. The text is enlarged ~3x. Tap the right side to go forward, the left side to go back.</p>
-  <button class="btn" onclick="document.getElementById('file').click()">Choose PDF</button>
+  <p>Upload a PDF. Text is enlarged 3x. Tap right half to go forward, left half to go back.</p>
+  <button class="btn" onclick="document.getElementById('file').click()">📂 Choose PDF</button>
   <input type="file" id="file" accept="application/pdf">
   <div id="loading"></div>
 </div>
 
+<!-- Book -->
 <div id="book">
-  <div id="counter"></div>
+  <!-- Top bar -->
+  <div id="topbar">
+    <button class="icon-btn" id="menu-btn" title="Pages &amp; Bookmarks">☰</button>
+    <span id="page-label"></span>
+    <button class="icon-btn" id="bm-btn" title="Bookmark this page">🔖</button>
+  </div>
+
+  <!-- Progress -->
+  <div id="progress-wrap">
+    <div id="progress-bar"><div id="progress-fill"></div></div>
+    <span id="prog-nums"></span>
+  </div>
+
   <div id="hint">Tap right → forward · Tap left → back</div>
+  <div id="bm-flash">Bookmarked!</div>
+</div>
+
+<!-- Resume banner -->
+<div id="resume-banner">
+  <div id="resume-msg"></div>
+  <div>
+    <button id="resume-yes">Resume</button>
+    <button id="resume-no">Start over</button>
+  </div>
+</div>
+
+<!-- Drawer overlay -->
+<div id="drawer-overlay"></div>
+
+<!-- Drawer -->
+<div id="drawer">
+  <div id="drawer-header">
+    <h2>Navigation</h2>
+    <button class="icon-btn" id="drawer-close" style="color:#888;font-size:20px;">✕</button>
+  </div>
+  <div id="drawer-tabs">
+    <button class="drawer-tab active" data-tab="pages">Pages</button>
+    <button class="drawer-tab" data-tab="bookmarks">Bookmarks</button>
+  </div>
+  <div id="drawer-body">
+    <!-- Pages tab -->
+    <div id="tab-pages">
+      <div id="jump-wrap">
+        <input id="jump-input" type="number" min="1" placeholder="Go to page…">
+        <button id="jump-btn">Go</button>
+      </div>
+      <div id="page-list"></div>
+    </div>
+    <!-- Bookmarks tab -->
+    <div id="tab-bookmarks" style="display:none;">
+      <div id="bm-list"></div>
+      <div id="no-bookmarks">No bookmarks yet. Tap 🔖 while reading to save a spot.</div>
+    </div>
+  </div>
 </div>
 
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-const WORDS_PER_PAGE = 55; // tune chunk size of words per "book" page
+const WORDS_PER_PAGE = 55;
 let pages = [];
 let idx = 0;
+let bookKey = '';   // localStorage key based on pdf name
+let animating = false;
 
-const fileInput = document.getElementById('file');
-const loading = document.getElementById('loading');
-const uploadScreen = document.getElementById('upload');
-const book = document.getElementById('book');
-const counter = document.getElementById('counter');
+/* ── DOM refs ── */
+const fileInput      = document.getElementById('file');
+const loading        = document.getElementById('loading');
+const uploadScreen   = document.getElementById('upload');
+const book           = document.getElementById('book');
+const pageLabel      = document.getElementById('page-label');
+const progressFill   = document.getElementById('progress-fill');
+const progNums       = document.getElementById('prog-nums');
+const menuBtn        = document.getElementById('menu-btn');
+const bmBtn          = document.getElementById('bm-btn');
+const bmFlash        = document.getElementById('bm-flash');
+const drawer         = document.getElementById('drawer');
+const drawerOverlay  = document.getElementById('drawer-overlay');
+const drawerClose    = document.getElementById('drawer-close');
+const pageList       = document.getElementById('page-list');
+const bmList         = document.getElementById('bm-list');
+const noBm           = document.getElementById('no-bookmarks');
+const jumpInput      = document.getElementById('jump-input');
+const jumpBtn        = document.getElementById('jump-btn');
+const resumeBanner   = document.getElementById('resume-banner');
+const resumeMsg      = document.getElementById('resume-msg');
+const resumeYes      = document.getElementById('resume-yes');
+const resumeNo       = document.getElementById('resume-no');
 
+/* ── Tab switching ── */
+let activeTab = 'pages';
+document.querySelectorAll('.drawer-tab').forEach(t => {
+  t.addEventListener('click', () => {
+    activeTab = t.dataset.tab;
+    document.querySelectorAll('.drawer-tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('tab-pages').style.display     = activeTab === 'pages'     ? '' : 'none';
+    document.getElementById('tab-bookmarks').style.display = activeTab === 'bookmarks' ? '' : 'none';
+    if (activeTab === 'pages') scrollPageListToCurrent();
+    if (activeTab === 'bookmarks') renderBookmarkList();
+  });
+});
+
+/* ── Drawer open/close ── */
+function openDrawer() {
+  drawer.classList.add('open');
+  drawerOverlay.classList.add('open');
+  if (activeTab === 'pages') { renderPageList(); scrollPageListToCurrent(); }
+  else renderBookmarkList();
+}
+function closeDrawer() {
+  drawer.classList.remove('open');
+  drawerOverlay.classList.remove('open');
+}
+menuBtn.addEventListener('click', e => { e.stopPropagation(); openDrawer(); });
+drawerClose.addEventListener('click', closeDrawer);
+drawerOverlay.addEventListener('click', closeDrawer);
+
+/* ── File load ── */
 fileInput.addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
+  bookKey = 'flipbook_' + file.name.replace(/\W/g,'_');
   loading.textContent = 'Reading PDF…';
   try {
     const buf = await file.arrayBuffer();
@@ -96,34 +328,47 @@ fileInput.addEventListener('change', async (e) => {
     let fullText = '';
     for (let p = 1; p <= pdf.numPages; p++) {
       loading.textContent = `Reading page ${p} of ${pdf.numPages}…`;
-      const page = await pdf.getPage(p);
-      const content = await page.getTextContent();
+      const pg = await pdf.getPage(p);
+      const content = await pg.getTextContent();
       fullText += content.items.map(i => i.str).join(' ') + ' ';
     }
     buildPages(fullText);
-    if (pages.length === 0) { loading.textContent = 'No readable text found in this PDF.'; return; }
+    if (pages.length === 0) { loading.textContent = 'No readable text found.'; return; }
     startBook();
   } catch (err) {
-    loading.textContent = 'Could not read this PDF: ' + err.message;
+    loading.textContent = 'Could not read PDF: ' + err.message;
   }
 });
 
 function buildPages(text) {
-  const words = text.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  const words = text.replace(/\s+/g,' ').trim().split(' ').filter(Boolean);
   pages = [];
-  for (let i = 0; i < words.length; i += WORDS_PER_PAGE) {
+  for (let i = 0; i < words.length; i += WORDS_PER_PAGE)
     pages.push(words.slice(i, i + WORDS_PER_PAGE).join(' '));
-  }
 }
 
+/* ── Start ── */
 function startBook() {
   uploadScreen.style.display = 'none';
   book.style.display = 'block';
   idx = 0;
-  renderPage();
+
+  // Check saved position
+  const saved = getSavedPage();
+  if (saved > 0 && saved < pages.length) {
+    resumeMsg.textContent = `Resume at page ${saved + 1} of ${pages.length}?`;
+    resumeBanner.style.display = 'block';
+    resumeYes.onclick = () => { idx = saved; resumeBanner.style.display='none'; renderPage(); };
+    resumeNo.onclick  = () => { savePage(0); resumeBanner.style.display='none'; renderPage(); };
+  } else {
+    renderPage();
+  }
+
+  jumpInput.max = pages.length;
   book.addEventListener('click', onTap);
 }
 
+/* ── Render ── */
 function renderPage() {
   document.querySelectorAll('.page').forEach(p => p.remove());
   const div = document.createElement('div');
@@ -132,15 +377,23 @@ function renderPage() {
   inner.className = 'page-inner';
   inner.textContent = pages[idx];
   div.appendChild(inner);
-  book.insertBefore(div, counter);
-  counter.textContent = `${idx + 1} / ${pages.length}`;
+  // Insert before topbar sibling — just append to book
+  book.appendChild(div);
+
+  const pct = pages.length > 1 ? (idx / (pages.length - 1)) * 100 : 100;
+  progressFill.style.width = pct + '%';
+  pageLabel.textContent = `${idx + 1} / ${pages.length}`;
+  progNums.textContent  = `${idx + 1} / ${pages.length}`;
+  savePage(idx);
 }
 
-let animating = false;
+/* ── Tap to flip ── */
 function onTap(e) {
+  // Ignore taps on UI elements
+  if (e.target.closest('#topbar,#progress-wrap,#drawer,#drawer-overlay,#resume-banner,#bm-flash')) return;
   if (animating) return;
-  const forward = e.clientX > window.innerWidth / 2;
 
+  const forward = e.clientX > window.innerWidth / 2;
   if (forward && idx >= pages.length - 1) return;
   if (!forward && idx <= 0) return;
 
@@ -148,23 +401,106 @@ function onTap(e) {
     animating = true;
     const current = document.querySelector('.page');
     current.classList.add('flipping');
-    setTimeout(() => {
-      idx++;
-      renderPage();
-      animating = false;
-    }, 360);
+    setTimeout(() => { idx++; renderPage(); animating = false; }, 360);
   } else {
     idx--;
     renderPage();
     const current = document.querySelector('.page');
     current.style.transition = 'none';
-    current.style.transform = 'rotateY(-110deg)';
+    current.style.transform  = 'rotateY(-110deg)';
     requestAnimationFrame(() => {
-      current.style.transition = 'transform .55s ease';
-      current.style.transform = 'rotateY(0deg)';
+      requestAnimationFrame(() => {
+        current.style.transition = 'transform .55s ease';
+        current.style.transform  = 'rotateY(0deg)';
+      });
     });
   }
 }
+
+/* ── Jump ── */
+jumpBtn.addEventListener('click', () => {
+  const n = parseInt(jumpInput.value, 10);
+  if (!isNaN(n) && n >= 1 && n <= pages.length) {
+    idx = n - 1;
+    renderPage();
+    closeDrawer();
+    jumpInput.value = '';
+  }
+});
+jumpInput.addEventListener('keydown', e => { if (e.key === 'Enter') jumpBtn.click(); });
+
+/* ── Page list ── */
+function renderPageList() {
+  pageList.innerHTML = '';
+  pages.forEach((text, i) => {
+    const item = document.createElement('div');
+    item.className = 'page-list-item' + (i === idx ? ' current' : '');
+    item.dataset.i = i;
+    item.innerHTML = `
+      <div class="pli-num">${i + 1}</div>
+      <div><div style="font-size:13px;color:#bbb;">Page ${i + 1}</div>
+           <div class="pli-preview">${text}</div></div>`;
+    item.addEventListener('click', () => { idx = i; renderPage(); closeDrawer(); });
+    pageList.appendChild(item);
+  });
+}
+function scrollPageListToCurrent() {
+  renderPageList();
+  const el = pageList.querySelector('.current');
+  if (el) el.scrollIntoView({ block:'center', behavior:'smooth' });
+}
+
+/* ── Bookmarks ── */
+bmBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  const bms = getBookmarks();
+  if (bms.includes(idx)) {
+    showFlash('Already bookmarked');
+    return;
+  }
+  bms.push(idx);
+  bms.sort((a,b)=>a-b);
+  saveBookmarks(bms);
+  showFlash('🔖 Bookmarked page ' + (idx+1));
+});
+
+function showFlash(msg) {
+  bmFlash.textContent = msg;
+  bmFlash.style.opacity = '1';
+  setTimeout(() => bmFlash.style.opacity = '0', 1800);
+}
+
+function renderBookmarkList() {
+  const bms = getBookmarks();
+  bmList.innerHTML = '';
+  noBm.style.display = bms.length ? 'none' : '';
+  bms.forEach(i => {
+    const item = document.createElement('div');
+    item.className = 'bm-item';
+    item.innerHTML = `
+      <div class="bm-left">
+        <div class="bm-page">📍 Page ${i + 1} of ${pages.length}</div>
+        <div class="bm-preview">${pages[i] || ''}</div>
+      </div>
+      <button class="bm-del" data-i="${i}" title="Remove bookmark">✕</button>`;
+    item.querySelector('.bm-left').addEventListener('click', () => {
+      idx = i; renderPage(); closeDrawer();
+    });
+    item.querySelector('.bm-del').addEventListener('click', e => {
+      e.stopPropagation();
+      const updated = getBookmarks().filter(x => x !== i);
+      saveBookmarks(updated);
+      renderBookmarkList();
+    });
+    bmList.appendChild(item);
+  });
+}
+
+/* ── localStorage helpers ── */
+function getSavedPage()   { try { return parseInt(localStorage.getItem(bookKey+'_pos') || '0', 10); } catch(e){return 0;} }
+function savePage(n)      { try { localStorage.setItem(bookKey+'_pos', n); } catch(e){} }
+function getBookmarks()   { try { return JSON.parse(localStorage.getItem(bookKey+'_bm') || '[]'); } catch(e){return [];} }
+function saveBookmarks(b) { try { localStorage.setItem(bookKey+'_bm', JSON.stringify(b)); } catch(e){} }
 </script>
 </body>
 </html>
